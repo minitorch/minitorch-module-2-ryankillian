@@ -43,66 +43,98 @@ def index_to_position(index: Index, strides: Strides) -> int:
         Position in storage
     """
 
-    # TODO: Implement for Task 2.1.
-    raise NotImplementedError("Need to implement for Task 2.1")
+    # Calculate the position in the flattened array
+    position = np.dot(index, strides)  # Dot product sums up the element-wise products
+
+    return int(position)
 
 
 def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
     """
     Convert an `ordinal` to an index in the `shape`.
-    Should ensure that enumerating position 0 ... size of a
-    tensor produces every index exactly once. It
-    may not be the inverse of `index_to_position`.
+    This function calculates multi-dimensional indices based on the ordinal value and shape of the tensor.
 
     Args:
-        ordinal: ordinal position to convert.
-        shape : tensor shape.
-        out_index : return index corresponding to position.
-
+        ordinal (int): The ordinal position in the flattened tensor to convert.
+        shape (Shape): The shape of the tensor.
+        out_index (OutIndex): The output array where the computed index will be stored.
     """
-    # TODO: Implement for Task 2.1.
-    raise NotImplementedError("Need to implement for Task 2.1")
+    if ordinal < 0 or ordinal >= np.prod(shape):
+        raise IndexingError("Ordinal out of bounds.")
+
+    n = len(shape)
+    for i in range(n):
+        size = np.prod(shape[i + 1 :])  # Size of the dimension block
+        out_index[i] = ordinal // size
+        ordinal %= size
 
 
 def broadcast_index(
-    big_index: Index, big_shape: Shape, shape: Shape, out_index: OutIndex
+    big_index: Index, big_shape: Shape, small_shape: Shape, out_index: OutIndex
 ) -> None:
     """
     Convert a `big_index` into `big_shape` to a smaller `out_index`
-    into `shape` following broadcasting rules. In this case
-    it may be larger or with more dimensions than the `shape`
-    given. Additional dimensions may need to be mapped to 0 or
-    removed.
+    into `small_shape` following broadcasting rules. This maps an index from a larger tensor
+    to an index in a smaller tensor, handling dimensions that have been broadcasted.
 
     Args:
-        big_index : multidimensional index of bigger tensor
-        big_shape : tensor shape of bigger tensor
-        shape : tensor shape of smaller tensor
-        out_index : multidimensional index of smaller tensor
+        big_index: Index in the larger tensor.
+        big_shape: Shape of the larger tensor.
+        small_shape: Shape of the smaller tensor to broadcast to.
+        out_index: Output index in the smaller tensor shape.
 
     Returns:
-        None
+        None: Fills `out_index` with the correct index values.
     """
-    # TODO: Implement for Task 2.2.
-    raise NotImplementedError("Need to implement for Task 2.2")
+    # Start by initializing out_index to zeros
+    out_index.fill(0)
+
+    # Calculate the difference in dimensions
+    dim_diff = len(big_shape) - len(small_shape)
+
+    # Iterate over each dimension in the smaller shape
+    for i in range(len(small_shape)):
+        if small_shape[i] == 1:
+            # If the dimension is 1 in the smaller shape, it absorbs any index because of broadcasting
+            out_index[i] = 0
+        else:
+            # Otherwise, directly map the index from the big tensor to the small tensor
+            # making sure to account for the difference in the number of dimensions
+            out_index[i] = big_index[i + dim_diff]
+
+    # This function modifies out_index in place and does not return a value
 
 
 def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
     """
-    Broadcast two shapes to create a new union shape.
+    Broadcast two shapes to create a new union shape that is compatible with both input shapes.
+    Broadcasting is a way to apply operations to arrays with different shapes. The function
+    aligns the shapes starting from the trailing dimensions, and dimensions are compatible when
+    one of them is 1 or both are equal.
 
     Args:
-        shape1 : first shape
-        shape2 : second shape
+        shape1 : first shape (tuple of int)
+        shape2 : second shape (tuple of int)
 
     Returns:
-        broadcasted shape
+        broadcasted shape (tuple of int)
 
     Raises:
-        IndexingError : if cannot broadcast
+        IndexingError : if the shapes cannot be broadcast according to the broadcasting rules
     """
-    # TODO: Implement for Task 2.2.
-    raise NotImplementedError("Need to implement for Task 2.2")
+    result = []
+    for dim1, dim2 in zip(reversed(shape1), reversed(shape2)):
+        if dim1 != dim2 and dim1 != 1 and dim2 != 1:
+            raise IndexingError(f"Shapes {shape1} and {shape2} cannot be broadcast")
+        result.append(max(dim1, dim2))
+
+    # Handle remaining dimensions of the longer shape
+    if len(shape1) > len(shape2):
+        result.extend(reversed(shape1[: len(shape1) - len(shape2)]))
+    else:
+        result.extend(reversed(shape2[: len(shape2) - len(shape1)]))
+
+    return tuple(reversed(result))
 
 
 def strides_from_shape(shape: UserShape) -> UserStrides:
@@ -210,20 +242,29 @@ class TensorData:
 
     def permute(self, *order: int) -> TensorData:
         """
-        Permute the dimensions of the tensor.
+        Permute the dimensions of the tensor according to the specified order.
 
         Args:
-            order (list): a permutation of the dimensions
+            order (tuple of int): The desired order of the dimensions, where each element
+                                specifies the new position of the dimension at that index.
 
         Returns:
-            New `TensorData` with the same storage and a new dimension order.
+            TensorData: A new TensorData instance with dimensions permuted according to 'order'.
+
+        Raises:
+            AssertionError: If the 'order' does not contain all dimensions exactly once.
         """
+        # Ensure the order contains each dimension exactly once
         assert list(sorted(order)) == list(
             range(len(self.shape))
-        ), f"Must give a position to each dimension. Shape: {self.shape} Order: {order}"
+        ), f"Order {order} does not match tensor dimensions {len(self.shape)}"
 
-        # TODO: Implement for Task 2.1.
-        raise NotImplementedError("Need to implement for Task 2.1")
+        # Calculate the new shape and strides
+        new_shape = [self.shape[dim] for dim in order]
+        new_strides = [self.strides[dim] for dim in order]
+
+        # Create a new TensorData with the same storage but new shape and strides
+        return TensorData(self._storage, tuple(new_shape), tuple(new_strides))
 
     def to_string(self) -> str:
         s = ""
