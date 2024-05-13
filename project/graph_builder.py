@@ -72,9 +72,7 @@ class GraphBuilder:
                     G.add_edge(self.get_name(input), op, f"{i}")
 
                 for input in cur.history.inputs:
-                    if not isinstance(
-                        input, minitorch.Tensor
-                    ):
+                    if not isinstance(input, minitorch.Tensor):
                         continue
                     queue.append([input])
         return G
